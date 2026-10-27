@@ -156,13 +156,22 @@ import { PreparedRegExpRouter } from ${original}
 import { MESSAGE_MATCHER_IS_ALREADY_BUILT } from '../../router.js'
 const pathPatterns = new Map(${serializedPathPatterns})
 const lineTerminators = /[\\r\\n\\u2028\\u2029]/
-export class RegExpRouter extends PreparedRegExpRouter {
-  #matcherBuilt = false
+export class RegExpRouter {
+  name = 'PreparedRegExpRouter'
+  #routes = []
   #registeredPatterns = new Map()
-  constructor() {
-    // Each router needs its own mutable matcher and handler tables.
-    super(...${serialized})
-    const filterMatch = (method, path, result) => {
+  match(method, path) {
+    // Mounted sub-app routers may never be queried. Create their independent
+    // mutable tables only when needed, then release the queued registrations.
+    const router = new PreparedRegExpRouter(...${serialized})
+    for (const route of this.#routes) {
+      router.add(...route)
+    }
+    this.#routes = undefined
+    this.match = (method, path) => {
+      // Call through the delegate so Hono can replace its own first matcher
+      // without removing the wrapper's line-terminator check.
+      const result = router.match(method, path)
       if (!lineTerminators.test(path)) {
         return result
       }
@@ -178,28 +187,23 @@ export class RegExpRouter extends PreparedRegExpRouter {
       }
       return [[], []]
     }
-    const match = this.match
-    this.match = (method, path) => {
-      this.#matcherBuilt = true
-      const result = match.call(this, method, path)
-      // Hono replaces this.match on its first lookup. Preserve the exceptional
-      // path check around that initialized matcher for all subsequent requests.
-      const preparedMatch = this.match
-      this.match = (method, path) => filterMatch(method, path, preparedMatch.call(this, method, path))
-      return filterMatch(method, path, result)
-    }
+    return this.match(method, path)
   }
   add(method, path, handler) {
-    if (this.#matcherBuilt) {
+    if (!this.#routes) {
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT)
     }
-    super.add(method, path, handler)
+    const pattern = pathPatterns.get(path === '/*' ? '*' : path)
+    if (!pattern) {
+      throw new Error('Path ' + path + ' is not registered')
+    }
+    this.#routes.push([method, path, handler])
     let patterns = this.#registeredPatterns.get(method)
     if (!patterns) {
       patterns = new Set()
       this.#registeredPatterns.set(method, patterns)
     }
-    patterns.add(pathPatterns.get(path === '/*' ? '*' : path))
+    patterns.add(pattern)
   }
 }`
   },
