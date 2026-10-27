@@ -68,6 +68,8 @@
     "@hono/node-server": "^1.19.11",
     "@types/node": "^24.10.0",
     "hono": "^4.6.12",
+    "hono-prepared-4-9-11": "npm:hono@4.9.11",
+    "hono-prepared-4-9-12": "npm:hono@4.9.12",
     "vite": "^6.1.1",
     "vitest": "^2.1.1"
   },

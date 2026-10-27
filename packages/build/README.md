@@ -102,6 +102,7 @@ type BuildOptions = {
   minify?: boolean
   emptyOutDir?: boolean
   preset?: 'hono' | 'hono/tiny' | 'hono/quick' '@hono/hono'
+  preparedRouter?: { paths: string[] }
 }
 ```
 
@@ -119,6 +120,36 @@ export const defaultOptions = {
   preset: 'hono',
 }
 ```
+
+### Precompile routing paths
+
+With Hono 4.9.11 or later, opt in to `PreparedRegExpRouter` by listing the paths your application registers:
+
+```ts
+import { defineConfig } from 'vite'
+import build from '@hono/vite-build/cloudflare-workers'
+
+export default defineConfig({
+  plugins: [
+    build({
+      entry: './src/index.ts',
+      preparedRouter: {
+        paths: ['/', '/users/:id', '/users/:id/posts/:postId'],
+      },
+    }),
+  ],
+})
+```
+
+The plugin computes the routing matchers during the build and embeds them in the bundle. It uses the application's installed Hono for both compilation and runtime, so their internal router formats stay in sync. Application entry modules are not executed to discover routes.
+
+The option applies to bundled ESM `RegExpRouter` instances from the installed Hono package, including those created by the default Hono preset. Each instance gets its own matcher tables. Existing custom routers and the `hono/tiny` and `hono/quick` presets retain their behavior. Without this option, older Hono versions remain supported.
+
+When using several build plugin instances in one Vite build, pass the same complete path list to every instance that enables `preparedRouter`. Include the paths needed by all of their applications.
+
+Include every registered path, including middleware, static-file hooks, sub-app paths, and their mounted paths. For example, mounting a sub-app with `/users/:id` at `/api` requires both `/users/:id` and `/api/users/:id`. Global `*` matching is added automatically. Registering an unlisted path fails when the application initializes its router.
+
+All paths must be compatible with a single regular-expression router, even when they belong to different HTTP methods or app instances. For example, `/:id` and `/:name` cannot be combined. Unsupported path combinations fail the build. Use the ordinary router for applications with paths that are only known at runtime. Hono must be bundled for this optimization to take effect.
 
 ## Platform specific things
 
