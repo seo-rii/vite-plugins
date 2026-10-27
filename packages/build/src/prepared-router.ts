@@ -163,9 +163,15 @@ export class RegExpRouter {
   match(method, path) {
     // Mounted sub-app routers may never be queried. Create their independent
     // mutable tables only when needed, then release the queued registrations.
-    const router = new PreparedRegExpRouter(...${serialized})
+    const params = ${serialized}
+    const router = new PreparedRegExpRouter(...params)
     for (const route of this.#routes) {
       router.add(...route)
+    }
+    // Registration can create ordinary objects for per-method static maps.
+    // Keep inherited keys from becoming matches for custom getPath strings.
+    for (const matcher of Object.values(params[0])) {
+      Object.setPrototypeOf(matcher[2], null)
     }
     this.#routes = undefined
     this.match = (method, path) => {

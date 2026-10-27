@@ -145,6 +145,8 @@ The plugin computes the routing matchers during the build and embeds them in the
 
 The option applies to bundled ESM `RegExpRouter` instances from the installed Hono package, including those created by the default Hono preset. Each instance creates its own matcher tables on its first match. Mounted sub-app routers do not allocate those tables unless they are also queried directly. Explicit `RegExpRouter` instances still reject route and middleware registration after their first match. Existing custom routers and the `hono/tiny` and `hono/quick` presets retain their behavior. Without this option, older Hono versions remain supported.
 
+Custom `getPath` routing keys such as `constructor`, `toString`, and `__proto__` retain ordinary wildcard matching.
+
 Precompilation conservatively supports simple URI path segments, identifier-style parameter names, optional final parameters, and final `/*` wildcards. If the manifest contains unrecognized path syntax, custom parameter patterns, interior wildcards, or dynamic paths whose literal prefixes overlap a wildcard's prefix, the plugin emits a warning and keeps the original Hono router for that build. This preserves method-specific handlers and parameter captures when a shared prepared table cannot safely represent them. For example, `/users/:id/*` with `/users/:name` uses the original router; `/static/*` with `/users/:id` can still be precompiled.
 
 For requests whose decoded paths contain line terminators, the router also checks the paths actually registered for that method or `ALL`. These checks use regular expressions compiled during the build, preserving ordinary method matching without including the runtime compiler.
