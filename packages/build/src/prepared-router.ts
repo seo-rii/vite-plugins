@@ -10,10 +10,30 @@ export type PreparedRouterOptions = {
 type RouterModule = {
   PreparedRegExpRouter?: unknown
   buildInitParams?: (options: { paths: string[] }) => unknown
-  serializeInitParams?: (params: unknown) => string
 }
 
 type LoadHook = Exclude<NonNullable<Plugin['load']>, { handler: unknown }>
+
+const serializeParams = (value: unknown): string => {
+  if (value instanceof RegExp) {
+    return value.toString()
+  }
+  if (Array.isArray(value)) {
+    return `[${Array.from(value, serializeParams).join(',')}]`
+  }
+  if (value !== null && typeof value === 'object') {
+    const properties = Object.entries(value).map(([key, entry]) => {
+      // An own __proto__ key needs computed syntax to remain a data property.
+      const name = key === '__proto__' ? `[${JSON.stringify(key)}]` : JSON.stringify(key)
+      return `${name}:${serializeParams(entry)}`
+    })
+    if (Object.getPrototypeOf(value) === null) {
+      properties.unshift('__proto__:null')
+    }
+    return `{${properties.join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'undefined'
+}
 
 export const createPreparedRouter = (options?: PreparedRouterOptions): { load: LoadHook } => ({
   async load(id) {
@@ -38,8 +58,7 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
     const router = (await import(moduleUrl.href)) as RouterModule
     if (
       typeof router.PreparedRegExpRouter !== 'function' ||
-      typeof router.buildInitParams !== 'function' ||
-      typeof router.serializeInitParams !== 'function'
+      typeof router.buildInitParams !== 'function'
     ) {
       this.error(
         'The preparedRouter option requires Hono >= 4.9.11. Upgrade Hono in the application or remove preparedRouter.'
@@ -50,7 +69,7 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
     try {
       // The generated entry and global middleware also need to match unknown paths.
       const paths = [...new Set(['*', ...options.paths])]
-      serialized = router.serializeInitParams(router.buildInitParams({ paths }))
+      serialized = serializeParams(router.buildInitParams({ paths }))
     } catch (error) {
       this.error(`Cannot compile preparedRouter.paths: ${String(error)}`)
     }
