@@ -9,7 +9,7 @@ export type PreparedRouterOptions = {
 
 type RouterModule = {
   PreparedRegExpRouter?: unknown
-  buildInitParams?: (options: { paths: string[] }) => unknown
+  buildInitParams?: (options: { paths: string[] }) => [{ ALL: [RegExp, unknown, unknown] }, unknown]
 }
 
 type LoadHook = Exclude<NonNullable<Plugin['load']>, { handler: unknown }>
@@ -131,10 +131,20 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
       return
     }
 
+    const buildInitParams = router.buildInitParams
     let serialized: string
+    let serializedPathPatterns: string
     try {
       // The generated entry and global middleware also need to match unknown paths.
-      serialized = serializeParams(router.buildInitParams({ paths }))
+      serialized = serializeParams(buildInitParams({ paths }))
+      // A shared matcher can accept line terminators through a parameter path
+      // registered only for another method or another application. Keep each
+      // path's original regexp so those requests can check actual registrations.
+      // Certified literal paths cannot contain line terminators, so singleton
+      // static maps cannot match these exceptional requests.
+      serializedPathPatterns = serializeParams(
+        paths.map((path) => [path, buildInitParams({ paths: [path] })[0].ALL[0]])
+      )
     } catch (error) {
       this.error(`Cannot compile preparedRouter.paths: ${String(error)}`)
     }
@@ -144,15 +154,39 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
     return `export * from ${original}
 import { PreparedRegExpRouter } from ${original}
 import { MESSAGE_MATCHER_IS_ALREADY_BUILT } from '../../router.js'
+const pathPatterns = new Map(${serializedPathPatterns})
+const lineTerminators = /[\\r\\n\\u2028\\u2029]/
 export class RegExpRouter extends PreparedRegExpRouter {
   #matcherBuilt = false
+  #registeredPatterns = new Map()
   constructor() {
     // Each router needs its own mutable matcher and handler tables.
     super(...${serialized})
+    const filterMatch = (method, path, result) => {
+      if (!lineTerminators.test(path)) {
+        return result
+      }
+      for (const registeredMethod of [method, 'ALL']) {
+        const patterns = this.#registeredPatterns.get(registeredMethod)
+        if (patterns) {
+          for (const pattern of patterns) {
+            if (pattern.test(path)) {
+              return result
+            }
+          }
+        }
+      }
+      return [[], []]
+    }
     const match = this.match
     this.match = (method, path) => {
       this.#matcherBuilt = true
-      return match.call(this, method, path)
+      const result = match.call(this, method, path)
+      // Hono replaces this.match on its first lookup. Preserve the exceptional
+      // path check around that initialized matcher for all subsequent requests.
+      const preparedMatch = this.match
+      this.match = (method, path) => filterMatch(method, path, preparedMatch.call(this, method, path))
+      return filterMatch(method, path, result)
     }
   }
   add(method, path, handler) {
@@ -160,6 +194,12 @@ export class RegExpRouter extends PreparedRegExpRouter {
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT)
     }
     super.add(method, path, handler)
+    let patterns = this.#registeredPatterns.get(method)
+    if (!patterns) {
+      patterns = new Set()
+      this.#registeredPatterns.set(method, patterns)
+    }
+    patterns.add(pathPatterns.get(path === '/*' ? '*' : path))
   }
 }`
   },

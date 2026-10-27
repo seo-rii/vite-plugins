@@ -147,6 +147,8 @@ The option applies to bundled ESM `RegExpRouter` instances from the installed Ho
 
 Precompilation conservatively supports simple URI path segments, identifier-style parameter names, optional final parameters, and final `/*` wildcards. If the manifest contains unrecognized path syntax, custom parameter patterns, interior wildcards, or dynamic paths whose literal prefixes overlap a wildcard's prefix, the plugin emits a warning and keeps the original Hono router for that build. This preserves method-specific handlers and parameter captures when a shared prepared table cannot safely represent them. For example, `/users/:id/*` with `/users/:name` uses the original router; `/static/*` with `/users/:id` can still be precompiled.
 
+For requests whose decoded paths contain line terminators, the router also checks the paths actually registered for that method or `ALL`. These checks use regular expressions compiled during the build, preserving ordinary method matching without including the runtime compiler.
+
 When using several build plugin instances in one Vite build, pass the same complete path list to every instance that enables `preparedRouter`. Include the paths needed by all of their applications.
 
 Include every registered path, including middleware, static-file hooks, sub-app paths, and their mounted paths. For example, mounting a sub-app with `/users/:id` at `/api` requires both `/users/:id` and `/api/users/:id`. Global `*` matching is added automatically. When paths are precompiled, registering an unlisted path fails when the application initializes its router.
