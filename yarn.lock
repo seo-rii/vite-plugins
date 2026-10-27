@@ -1101,6 +1101,8 @@ __metadata:
     "@hono/node-server": "npm:^1.19.11"
     "@types/node": "npm:^24.10.0"
     hono: "npm:^4.6.12"
+    hono-prepared-4-9-11: "npm:hono@4.9.11"
+    hono-prepared-4-9-12: "npm:hono@4.9.12"
     vite: "npm:^6.1.1"
     vitest: "npm:^2.1.1"
   peerDependencies:
@@ -3845,6 +3847,20 @@ __metadata:
   dependencies:
     function-bind: "npm:^1.1.2"
   checksum: 10c0/3769d434703b8ac66b209a4cca0737519925bbdb61dd887f93a16372b14694c63ff4e797686d87c90f08168e81082248b9b028bad60d4da9e0d1148766f56eb9
+  languageName: node
+  linkType: hard
+
+"hono-prepared-4-9-11@npm:hono@4.9.11":
+  version: 4.9.11
+  resolution: "hono@npm:4.9.11"
+  checksum: 10c0/cc7b839c83c55bc04497461ccadcee731e66127266090c73ffcc28d11ea4588900e9b2b2c65483ee4732fa0dfbc709d954f5bf10c93bb9215adb166f83c6d20b
+  languageName: node
+  linkType: hard
+
+"hono-prepared-4-9-12@npm:hono@4.9.12":
+  version: 4.9.12
+  resolution: "hono@npm:4.9.12"
+  checksum: 10c0/e63b1b82a2a8804501e3ecd7ec27a2e34b35455b4ea1bb35535bc2dfea48b4be20ecb09990510162477280dd23ce98013958d0c50306b510ae2ecea776ed06e5
   languageName: node
   linkType: hard
 
