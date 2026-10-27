@@ -14,6 +14,55 @@ type RouterModule = {
 
 type LoadHook = Exclude<NonNullable<Plugin['load']>, { handler: unknown }>
 
+const canPrecompilePaths = (paths: string[]): boolean => {
+  const dynamicPaths: { prefix: string; wildcard: boolean }[] = []
+  for (const path of paths) {
+    if (path === '*' || path === '/*') {
+      continue
+    }
+    if (!path.startsWith('/')) {
+      return false
+    }
+    const segments = path.slice(1).split('/')
+    let firstDynamic = -1
+    let wildcard = false
+    for (const [index, segment] of segments.entries()) {
+      // Certify literal URI segments rather than inheriting the compiler's
+      // regexp syntax or internal #/@ marker handling from arbitrary text.
+      if (/^[a-zA-Z0-9._~!$&'()+,;=%-]*$/.test(segment)) {
+        continue
+      }
+      firstDynamic = firstDynamic === -1 ? index : firstDynamic
+      const last = index === segments.length - 1
+      if (segment === '*' && last) {
+        wildcard = true
+      } else if (
+        !/^:[a-zA-Z_][a-zA-Z0-9_]*\??$/.test(segment) ||
+        (segment.endsWith('?') && !last)
+      ) {
+        // Custom patterns and interior wildcards can change capture groups or
+        // shadow a different method's route when compiled into a shared table.
+        return false
+      }
+    }
+    if (firstDynamic !== -1) {
+      dynamicPaths.push({ prefix: segments.slice(0, firstDynamic).join('/'), wildcard })
+    }
+  }
+
+  // Without method information, overlapping dynamic paths must keep separate
+  // runtime tables if either path can also match a longer or shorter path.
+  return !dynamicPaths.some(
+    (path, index) =>
+      path.wildcard &&
+      dynamicPaths.some(
+        (other, otherIndex) =>
+          index !== otherIndex &&
+          (path.prefix.startsWith(other.prefix) || other.prefix.startsWith(path.prefix))
+      )
+  )
+}
+
 const serializeParams = (value: unknown): string => {
   if (value instanceof RegExp) {
     return value.toString()
@@ -74,10 +123,17 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
       )
     }
 
+    const paths = [...new Set(['*', ...options.paths])]
+    if (!canPrecompilePaths(paths)) {
+      this.warn(
+        'Cannot safely precompile preparedRouter.paths with overlapping dynamic wildcards or complex path syntax. Using the original RegExpRouter to preserve method-specific matching and parameters.'
+      )
+      return
+    }
+
     let serialized: string
     try {
       // The generated entry and global middleware also need to match unknown paths.
-      const paths = [...new Set(['*', ...options.paths])]
       serialized = serializeParams(router.buildInitParams({ paths }))
     } catch (error) {
       this.error(`Cannot compile preparedRouter.paths: ${String(error)}`)
