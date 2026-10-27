@@ -143,10 +143,23 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
     const original = JSON.stringify(`${id}?hono-vite-build-original`)
     return `export * from ${original}
 import { PreparedRegExpRouter } from ${original}
+import { MESSAGE_MATCHER_IS_ALREADY_BUILT } from '../../router.js'
 export class RegExpRouter extends PreparedRegExpRouter {
+  #matcherBuilt = false
   constructor() {
     // Each router needs its own mutable matcher and handler tables.
     super(...${serialized})
+    const match = this.match
+    this.match = (method, path) => {
+      this.#matcherBuilt = true
+      return match.call(this, method, path)
+    }
+  }
+  add(method, path, handler) {
+    if (this.#matcherBuilt) {
+      throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT)
+    }
+    super.add(method, path, handler)
   }
 }`
   },
