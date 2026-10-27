@@ -65,6 +65,15 @@ export const createPreparedRouter = (options?: PreparedRouterOptions): { load: L
       )
     }
 
+    const unsupportedWildcard = options.paths.find(
+      (path) => path !== '*' && path.endsWith('*') && !path.endsWith('/*')
+    )
+    if (unsupportedWildcard !== undefined) {
+      this.error(
+        `preparedRouter.paths contains unsupported non-segment wildcard ${JSON.stringify(unsupportedWildcard)}. Disable preparedRouter for this application to preserve handler matching.`
+      )
+    }
+
     let serialized: string
     try {
       // The generated entry and global middleware also need to match unknown paths.

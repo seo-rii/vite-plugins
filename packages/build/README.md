@@ -149,6 +149,8 @@ When using several build plugin instances in one Vite build, pass the same compl
 
 Include every registered path, including middleware, static-file hooks, sub-app paths, and their mounted paths. For example, mounting a sub-app with `/users/:id` at `/api` requires both `/users/:id` and `/api/users/:id`. Global `*` matching is added automatically. Registering an unlisted path fails when the application initializes its router.
 
+Trailing wildcards must occupy a complete path segment, as in `/foo/*`. The build rejects `/foo*` and similar patterns because precompiled tables can otherwise skip handlers when paths belong to different HTTP methods. Disable `preparedRouter` for applications using these patterns.
+
 All paths must be compatible with a single regular-expression router, even when they belong to different HTTP methods or app instances. For example, `/:id` and `/:name` cannot be combined. Unsupported path combinations fail the build. Use the ordinary router for applications with paths that are only known at runtime. Hono must be bundled for this optimization to take effect.
 
 ## Platform specific things
